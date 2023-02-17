@@ -1,4 +1,4 @@
-# Form implementation generated from reading ui file 'c:\Users\juane\Desktop\Emes reportes\client\gui.ui'
+# Form implementation generated from reading ui file 'c:\Users\juane\Desktop\emes_reportes\gui\gui.ui'
 #
 # Created by: PyQt6 UI code generator 6.4.0
 #

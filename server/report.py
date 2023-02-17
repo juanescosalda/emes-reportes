@@ -1,85 +1,53 @@
-import logging
-from server.excel import XlsxWriterEditor
-import pandas as pd
-from pandas.core.frame import DataFrame
 import copy
 import random
+import logging
+import pandas as pd
+from server.excel import XlsxWriterEditor
+from pandas.core.frame import DataFrame
 from server.preprocess import Preprocessing
-
-logging.basicConfig(filename='app.log',
-                    format='%(asctime)s - %(message)s',
-                    datefmt='%d-%b-%y %H:%M:%S')
 
 
 class EmesReport:
 
-    PRICES = [
-        'Precio Neto',
-        'Costo Total',
-        'Nota'
-    ]
+    PRICES = \
+        [
+            'Precio Neto',
+            'Costo Total',
+            'Nota'
+        ]
 
-    LEFT_ALIGN = [
-        'Descripción',
-        'Cliente',
-        'Vendedor',
-        'NIT',
-        'Sigla'
-    ]
+    LEFT_ALIGN = \
+        [
+            'Descripción',
+            'Cliente',
+            'Vendedor',
+            'NIT',
+            'Sigla'
+        ]
 
-    JOINED_SUPPLIERS = [
-        '248-TECNOQUIMICAS',
-        '115-BAXTER',
-        '206-MK',
-        '254-WASSER CH'
-    ]
+    JOINED_SUPPLIERS = \
+        [
+            '248-TECNOQUIMICAS',
+            '115-BAXTER',
+            '206-MK',
+            '254-WASSER CH'
+        ]
 
-    SUMMARY_COLS = [
-        'Descuento sistema',
-        'Descuento feria',
-        'Diferencia feria $',
-        'Descuento real',
-        'Diferencia real $',
-        'Diferencia real %',
-    ]
+    SUMMARY_COLS = \
+        [
+            'Descuento sistema',
+            'Descuento feria',
+            'Diferencia feria $',
+            'Descuento real',
+            'Diferencia real $',
+            'Diferencia real %',
+        ]
 
-    def __init__(self,
-                 path_grid: str,
-                 path_to: str,
-                 path_groups: str):
-
-        # set path to save reports
-        self.__path_to = path_to
-
-        # create use dataframe
+    def __init__(self):
+        """
+        Default constructor
+        """
         self.__df_use = None
-
-        # create Preprocessing object
-        p = Preprocessing(
-            path_grid,
-            path_groups
-        )
-
-        p.run()
-
-        self.__df_base = p.base
-        self.__df_discounts = p.discounts
-        self.__data = p.data
-        self.__suppliers = p.get_suppliers()
-        self.__active_suppliers = \
-            [k for k, v in self.__suppliers.items() if v]
-
-        # create summary report dataframe
-        self.__df_summ = pd.DataFrame(
-            columns=EmesReport.SUMMARY_COLS
-        )
-
-        self.__df_summ.index.names = ['Proveedor']
-
-        # create joined dataframes from special case (Tecnoquímicas)
-        self.__df1_joined, self.__df2_joined = (
-            pd.DataFrame() for _ in range(2)
-        )
 
     @property
     def data(self) -> DataFrame:
@@ -187,7 +155,7 @@ class EmesReport:
                     axis=1
                 )
 
-            # delete all the product with bonus
+            # Delete all the product with bonus
             df_in = df[mask]
             df_in = self.__remove_bonus_rows(df_in)
 
@@ -222,23 +190,23 @@ class EmesReport:
                 use_value
             )
 
-            # falculate the discount value
+            # Calculate the discount value
             discount_value = df_out[base_price] * df_out['% Descuento']
 
-            # add '% Descuento', 'Nota' and 'Fecha' columns
+            # Add '% Descuento', 'Nota' and 'Fecha' columns
             df_out['Nota'] = discount_value
 
-            # prepare data
+            # Prepare data
             df_out = (
                 df_out
                 .sort_values(by=['Nota'], ascending=False)
                 .reset_index(drop=True)
             )
 
-            # cumulative discounts column
+            # Cumulative discounts column
             df_out['cumsum'] = df_out['Nota'].cumsum()
 
-            # select next value to condition if exists
+            # Select next value to condition if exists
             match_list = df_out.index[df_out['cumsum'] <= total_diff].tolist()
 
             if match_list:
@@ -247,10 +215,10 @@ class EmesReport:
                 else:
                     df_out = df_out.iloc[:match_list[-1] + 2]
 
-                # includes the next where condition is reached
+                # Includes the next value where condition is reached
                 df_out = df_out.query('`% Descuento` >= 0')
 
-                # append the new rows to df_in
+                # Append the new rows to df_in
                 df_in = pd.concat(
                     [
                         df_in,
@@ -338,7 +306,7 @@ class EmesReport:
         if mode == 1:
             dropped_cols += ["Costo Total"]
 
-        # check if columns to be dropped exist in the dataframe
+        # Check if columns to be dropped exist in the dataframe
         cols_to_drop = set(dropped_cols) & set(df.columns)
 
         return \
@@ -416,7 +384,7 @@ class EmesReport:
 
         cols_to_drop = df.columns[col_idx + 1:].to_list()
 
-        # add common columns
+        # Add common columns
         cols_to_drop.append('Valor descuento')
         cols_to_drop.append('Fecha')
 
@@ -484,7 +452,7 @@ class EmesReport:
             name
         )
 
-        # compare real discount vs 260 discount report
+        # Compare real discount vs 260 discount report
         discount_diff, sum_discount, sum_notes = self.__get_discount_diff(
             df_all,
             df_in
@@ -507,16 +475,16 @@ class EmesReport:
                 use_value
             )
 
-        # delete rows with discount less than zero and negative prices
+        # Delete rows with discount less than zero and negative prices
         df_in = df_in[(df_in[base_price] > 0) & (df_in['% Descuento'] > 0)]
 
-        # in case of zero-discount use all the dataframe
+        # In case of zero-discount use all the dataframe
         if df_in.empty:
             df_in = df_all
 
         sum_real_discount = df_in['Nota'].sum()
 
-        # fill summary
+        # Fill summary
         self.__fill_summary(
             name,
             sum_discount,
@@ -593,7 +561,7 @@ class EmesReport:
 
         mode = self.__df_base.loc[name, 'Base descuento']
 
-        # get Teleferias sheet
+        # Get Teleferias sheet
         df2, df_sheet2 = self._set_sheet2(
             df=df,
             mode=mode,
@@ -601,10 +569,10 @@ class EmesReport:
             use_mode=use_mode
         )
 
-        # get Rotacion sheet
+        # Get Rotacion sheet
         df_sheet1 = self._set_sheet1(df2)
 
-        # join dataframe for joined suppliers case
+        # Join dataframe for joined suppliers case
         if name in EmesReport.JOINED_SUPPLIERS:
             self.__join_to_data(df_sheet1, 1)
             self.__join_to_data(df_sheet2, 2)
@@ -612,7 +580,7 @@ class EmesReport:
             if name in EmesReport.JOINED_SUPPLIERS[:3]:
                 return
 
-            # if last supplier of list
+            # If last supplier of list
             df_sheet1 = self.__df1_joined.\
                 sort_values(by='Descripción').\
                 copy()
@@ -622,7 +590,7 @@ class EmesReport:
 
             name = '248-TECNOQUIMICAS'
 
-        # save dataframes into Excel
+        # Save dataframes into Excel
         self.__to_excel(
             name,
             df_sheet1,
@@ -695,7 +663,7 @@ class EmesReport:
                 index=False
             )
 
-            # edit worksheet
+            # Edit worksheet
             xlsx.format_worksheet(
                 df=df1,
                 worksheet=writer.sheets['Rotación'],
@@ -712,7 +680,7 @@ class EmesReport:
                         index=False
                     )
 
-                    # edit worksheet
+                    # Edit worksheet
                     xlsx.format_worksheet(
                         df=df2,
                         worksheet=writer.sheets['Teleferia'],
@@ -721,6 +689,49 @@ class EmesReport:
                         perc_cols=['% Descuento'],
                         include_sum=True
                     )
+
+    def initialize(
+            self,
+            path_to: str,
+            path_grid: str,
+            path_groups: str) -> None:
+        """
+        Creates main dataframes
+
+        Args:
+            path_to (str): Path to save reports
+            path_grid (str): Path where 260 report is located
+            path_groups (str): Path where proveedores.xlsx is located
+        """
+        self.__path_to = path_to
+
+        # Create Preprocessing object
+        p = Preprocessing(
+            path_grid,
+            path_groups
+        )
+
+        p.run()
+
+        self.__df_base = p.base
+        self.__df_discounts = p.discounts
+
+        self.__data = p.data
+        self.__suppliers = p.get_suppliers()
+        self.__active_suppliers = \
+            [k for k, v in self.__suppliers.items() if v]
+
+        # Create summary report dataframe
+        self.__df_summ = pd.DataFrame(
+            columns=EmesReport.SUMMARY_COLS
+        )
+
+        self.__df_summ.index.names = ['Proveedor']
+
+        # Create joined dataframes from special case (Tecnoquímicas)
+        self.__df1_joined, self.__df2_joined = (
+            pd.DataFrame() for _ in range(2)
+        )
 
     def include_use(
             self,
@@ -737,7 +748,7 @@ class EmesReport:
 
         self.__df_use = df.convert_dtypes()
 
-        # update files including use
+        # Update files including use
         self.run(
             suppliers,
             use_mode=True,
